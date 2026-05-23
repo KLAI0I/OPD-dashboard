@@ -84,7 +84,68 @@
 
   function logoFail(img,text){img.style.display='none';const f=img.parentElement.querySelector('.logoFallback');f.style.display='block';f.textContent=text;}
   function toast(msg,isError=false){const t=document.createElement('div');t.className='toast'+(isError?' error':'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500)}
-  function gs(success){return google.script.run.withFailureHandler(e=>{toast(e.message||String(e),true); clearPendingButtons();}).withSuccessHandler(success)}
+  // For GitHub Pages: paste your deployed Google Apps Script Web App /exec URL here.
+  // Example: https://script.google.com/macros/s/AKfycbxxxx/exec
+  const WEB_APP_URL = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_EXEC_URL_HERE';
+
+  function apiCall(fn, args, success){
+    // If hosted inside Google Apps Script, use native google.script.run.
+    if (window.google && google.script && google.script.run) {
+      return google.script.run
+        .withFailureHandler(e=>{toast(e.message||String(e),true); clearPendingButtons();})
+        .withSuccessHandler(success)[fn].apply(null, args || []);
+    }
+
+    // If hosted on GitHub Pages, use JSONP bridge to the Apps Script Web App.
+    if (!WEB_APP_URL || WEB_APP_URL.includes('PASTE_YOUR_GOOGLE_APPS_SCRIPT')) {
+      toast('Missing WEB_APP_URL. Paste your Apps Script Web App /exec URL in index.html.', true);
+      return;
+    }
+
+    const cb = '__gas_cb_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+    window[cb] = function(res){
+      try {
+        if (!res || !res.ok) throw new Error((res && res.error) || 'Unknown server error');
+        success(res.data);
+      } catch(e) {
+        toast(e.message || String(e), true);
+        clearPendingButtons();
+      } finally {
+        delete window[cb];
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+      }
+    };
+
+    const url = WEB_APP_URL
+      + '?api=1'
+      + '&fn=' + encodeURIComponent(fn)
+      + '&args=' + encodeURIComponent(JSON.stringify(args || []))
+      + '&callback=' + encodeURIComponent(cb)
+      + '&_=' + Date.now();
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = function(){
+      toast('Cannot reach Apps Script Web App. Check deployment access and URL.', true);
+      clearPendingButtons();
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+    document.body.appendChild(script);
+  }
+
+  function gs(success){
+    return {
+      login: pin => apiCall('login', [pin], success),
+      getInitialData: user => apiCall('getInitialData', [user], success),
+      getDashboardData: user => apiCall('getDashboardData', [user], success),
+      startPatient: payload => apiCall('startPatient', [payload], success),
+      dischargePatient: payload => apiCall('dischargePatient', [payload], success),
+      backupToday: user => apiCall('backupToday', [user], success),
+      manualDailyReset: user => apiCall('manualDailyReset', [user], success),
+      exportTodayCsv: user => apiCall('exportTodayCsv', [user], success)
+    };
+  }
   function clearPendingButtons(){Object.keys(pending).forEach(id=>pending[id]=false); document.querySelectorAll('button[data-clinic]').forEach(b=>b.disabled=false); renderClinics();}
 
   function login(){
