@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    :root{--bg:#020617;--panel:#0b1224;--panel2:#111a32;--text:#f8fafc;--muted:#a8b3c7;--line:rgba(148,163,184,.24);--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--cyan:#06b6d4;--blue:#2563eb;--purple:#a855f7;--pink:#ec4899}
+    *{box-sizing:border-box} html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;color:var(--text);background:radial-gradient(circle at top left,rgba(6,182,212,.22),transparent 32%),radial-gradient(circle at top right,rgba(168,85,247,.18),transparent 34%),linear-gradient(135deg,#020617,#0f172a 50%,#111827)}
+    header{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:220px 1fr 220px;gap:16px;align-items:center;padding:12px 18px;background:rgba(2,6,23,.9);border-bottom:1px solid rgba(6,182,212,.45);box-shadow:0 12px 36px rgba(0,0,0,.34);backdrop-filter:blur(12px)}
+    .logoBox{height:84px;background:#fff;border-radius:20px;display:flex;align-items:center;justify-content:center;padding:8px;box-shadow:0 0 24px rgba(6,182,212,.22)}
+    .logo{max-width:200px;max-height:70px;object-fit:contain}.logoFallback{display:none;color:#0f172a;font-weight:900;text-align:center}
+    h1{margin:0;text-align:center;font-size:36px;text-shadow:0 0 18px rgba(6,182,212,.5)}.subtitle{text-align:center;color:var(--muted);font-size:13px;margin-top:4px}
+    .container{width:100%;padding:16px}.panel{background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(11,18,36,.96));border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:16px;box-shadow:0 14px 34px rgba(0,0,0,.25)}.login{max-width:460px;margin:48px auto;border-color:rgba(6,182,212,.45)}
+    input,button{width:100%;border-radius:15px;border:1px solid rgba(148,163,184,.28);padding:15px;font-size:17px;color:var(--text);background:#111827;outline:none}input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(6,182,212,.14)}
+    button{border:0;font-weight:900;cursor:pointer;transition:.15s;box-shadow:0 10px 22px rgba(0,0,0,.25)}button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}button:disabled{opacity:.55;cursor:not-allowed;transform:none}.btn-green{background:linear-gradient(135deg,#16a34a,#22c55e)}.btn-red{background:linear-gradient(135deg,#dc2626,#ef4444)}.btn-orange{background:linear-gradient(135deg,#d97706,#f59e0b)}.btn-dark{background:linear-gradient(135deg,#1f2937,#111827)}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{width:auto;padding:13px 18px}.badge{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(6,182,212,.45);background:rgba(6,182,212,.08);border-radius:999px;padding:9px 14px;font-weight:900}.muted{color:var(--muted)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}.stat{position:relative;overflow:hidden;border-radius:20px;padding:18px;min-height:100px;box-shadow:0 14px 32px rgba(0,0,0,.28)}.stat:after{content:"";position:absolute;right:-20px;top:-35px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.16)}.stat span{display:block;font-size:15px}.stat b{display:block;font-size:36px;margin-top:10px}.stat:nth-child(1){background:linear-gradient(135deg,#0891b2,#2563eb)}.stat:nth-child(2){background:linear-gradient(135deg,#dc2626,#ec4899)}.stat:nth-child(3){background:linear-gradient(135deg,#16a34a,#0d9488)}.stat:nth-child(4){background:linear-gradient(135deg,#7c3aed,#f97316)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px}.clinic{border:2px solid var(--green);border-top-width:8px;background:linear-gradient(180deg,rgba(15,23,42,.95),rgba(15,23,42,.72));border-radius:22px;padding:16px;box-shadow:0 0 22px rgba(34,197,94,.16)}.clinic.vacant{animation:vacantPulse 1.15s infinite;border-color:#39ff14;box-shadow:0 0 18px #39ff14,0 0 40px rgba(57,255,20,.38),inset 0 0 16px rgba(57,255,20,.10)}@keyframes vacantPulse{0%,100%{box-shadow:0 0 12px #39ff14,0 0 28px rgba(57,255,20,.32),inset 0 0 10px rgba(57,255,20,.08)}50%{box-shadow:0 0 28px #39ff14,0 0 70px rgba(57,255,20,.72),inset 0 0 24px rgba(57,255,20,.18)}}.clinic.occupied{border-color:var(--red);box-shadow:0 0 26px rgba(239,68,68,.18)}.clinic.warning{border-color:var(--orange);box-shadow:0 0 28px rgba(245,158,11,.25)}.clinicHead{display:flex;justify-content:space-between;align-items:start;gap:12px}.clinicName{font-size:23px;font-weight:900}.status{font-weight:900;border-radius:999px;padding:9px 13px;font-size:13px}.vacantPill{color:#bbf7d0;background:rgba(57,255,20,.22);border:1px solid #39ff14;box-shadow:0 0 16px rgba(57,255,20,.7);animation:vacantBadgePulse 1s infinite}@keyframes vacantBadgePulse{50%{filter:brightness(1.8);transform:scale(1.03)}}.occupiedPill{color:#fecaca;background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.45)}.warningPill{color:#fed7aa;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.5)}
+    .meta{margin-top:12px;line-height:1.8}.timer{font-size:36px;font-weight:900;letter-spacing:1px;margin:10px 0;text-shadow:0 0 16px rgba(6,182,212,.35)}.clinicActions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.clinicActions button{font-size:17px;min-height:58px}.adminOnlyNote{margin-top:14px;padding:16px;border-radius:16px;background:rgba(148,163,184,.12);border:1px dashed rgba(148,163,184,.35);color:#cbd5e1;font-weight:900;text-align:center}
+    .chartGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.chart{background:#fff;border-radius:18px;min-height:320px;padding:10px;color:#111827}.tableWrap{overflow:auto}table{width:100%;border-collapse:separate;border-spacing:0 8px}th,td{text-align:left;padding:12px;background:rgba(15,23,42,.72)}th{color:#a7f3d0}tr td:first-child,th:first-child{border-radius:12px 0 0 12px}tr td:last-child,th:last-child{border-radius:0 12px 12px 0}.hidden{display:none!important}.toast{position:fixed;right:20px;bottom:20px;z-index:100;background:#16a34a;color:white;padding:14px 18px;border-radius:16px;font-weight:900;box-shadow:0 16px 32px rgba(0,0,0,.35)}.toast.error{background:#dc2626}footer{text-align:center;color:#cbd5e1;padding:26px}
+    @media(max-width:850px){header{grid-template-columns:1fr;gap:8px}.logoBox{height:62px}.logo{max-height:52px}h1{font-size:26px}.stats{grid-template-columns:1fr 1fr}.chartGrid{grid-template-columns:1fr}.clinicActions{grid-template-columns:1fr}.container{padding:10px}}
+    @media print{button,.actions,#loginPanel{display:none!important}body{background:white;color:#111827}.panel,.clinic{break-inside:avoid;background:white;color:#111827}.chart{border:1px solid #ddd}.container{padding:0}header{position:static;background:white;color:#111827}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logoBox"><img class="logo" src="https://drive.google.com/thumbnail?id=1hsph6kLTw2rV-7GYUorq5vbbGrrfoQZh&sz=w600" onerror="logoFail(this,'Makkah Health Cluster')"><div class="logoFallback"></div></div>
+    <div><h1 id="pageTitle">Mina new street - OPD Flow</h1><div class="subtitle">Live OPD room occupancy, visit counts, duration monitoring and reports</div></div>
+    <div class="logoBox"><img class="logo" src="https://drive.google.com/thumbnail?id=1XD22KX6GjgXKi6bmdv0GSbzuOGuIVFXs&sz=w600" onerror="logoFail(this,'Care Medical')"><div class="logoFallback"></div></div>
+  </header>
+
+  <main id="loginPanel" class="panel login">
+    <h2>Login</h2>
+    <p class="muted">Doctor PIN opens only assigned clinic. Admin PIN opens full dashboard.</p>
+    <input id="pin" type="password" placeholder="Enter PIN / Password" onkeydown="if(event.key==='Enter') login()">
+    <br><br><button class="btn-green" onclick="login()">Login</button>
+  </main>
+
+  <div id="app" class="hidden">
+    <div class="container">
+      <section class="panel topbar">
+        <div><div id="userBadge" class="badge">User</div><div id="serverTime" class="muted" style="margin-top:8px">Server time:</div></div>
+        <div class="actions">
+          <button class="btn-dark" onclick="loadData(false)">Refresh</button>
+          <button id="backupBtn" class="btn-orange" onclick="backupToday()">Backup Today</button>
+          <button id="resetBtn" class="btn-orange" onclick="manualReset()">Daily Reset</button>
+          <button id="csvBtn" class="btn-dark" onclick="downloadCsv()">Export CSV / Excel</button>
+          <button id="pdfBtn" class="btn-red" onclick="window.print()">Export PDF</button>
+          <button class="btn-dark" onclick="logout()">Logout</button>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat"><span>Total Visits Today</span><b id="totalVisits">0</b></div>
+        <div class="stat"><span>Occupied Clinics</span><b id="occupiedClinics">0</b></div>
+        <div class="stat"><span>Vacant Clinics</span><b id="vacantClinics">0</b></div>
+        <div class="stat"><span>Avg Duration / Completed</span><b id="avgDuration">0 min</b></div>
+      </section>
+
+      <section class="panel">
+        <div class="topbar"><h2 style="margin:0">Live Clinic Grid</h2><small class="muted">Green = vacant | Red = occupied | Orange = duration over 30 minutes</small></div><br>
+        <div id="clinicGrid" class="grid"></div>
+      </section>
+
+      <section id="adminReports" class="panel">
+        <div class="topbar"><h2 style="margin:0">Reports & Charts</h2><small class="muted">Charts update from today’s visits</small></div><br>
+        <div class="chartGrid"><div id="hourChart" class="chart"></div><div id="clinicChart" class="chart"></div><div id="doctorChart" class="chart"></div><div id="statusChart" class="chart"></div></div>
+      </section>
+
+      <section class="panel">
+        <h2>Today Visit Log</h2>
+        <div class="tableWrap"><table><thead><tr><th>Visit ID</th><th>Clinic</th><th>Doctor</th><th>Start</th><th>End</th><th>Duration</th><th>Status</th></tr></thead><tbody id="visitRows"></tbody></table></div>
+      </section>
+    </div>
+  </div>
+  <footer id="footerText">Designed By Mr. Mohamed Ghonim</footer>
+
+<script>
+  google.charts.load('current', {'packages':['corechart']});
+  let sessionUser=null, appData=null, refreshTimer=null, localTimer=null, pending={};
+  const LONG_MINUTES = 30;
+  const isAdmin = () => String(sessionUser?.role || '').toLowerCase() === 'admin';
+
+  function logoFail(img,text){img.style.display='none';const f=img.parentElement.querySelector('.logoFallback');f.style.display='block';f.textContent=text;}
+  function toast(msg,isError=false){const t=document.createElement('div');t.className='toast'+(isError?' error':'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500)}
+  function gs(success){return google.script.run.withFailureHandler(e=>{toast(e.message||String(e),true); clearPendingButtons();}).withSuccessHandler(success)}
+  function clearPendingButtons(){Object.keys(pending).forEach(id=>pending[id]=false); document.querySelectorAll('button[data-clinic]').forEach(b=>b.disabled=false); renderClinics();}
+
+  function login(){
+    const pin=document.getElementById('pin').value.trim();
+    gs(user=>{
+      sessionUser=user;
+      document.getElementById('loginPanel').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('userBadge').textContent=`${user.role}: ${user.doctorName || user.userName || 'Doctor'}${user.assignedClinicName && user.assignedClinicName!=='All Clinics'?' | '+user.assignedClinicName:''}`;
+      const admin=String(user.role).toLowerCase()==='admin';
+      ['backupBtn','resetBtn','csvBtn','pdfBtn'].forEach(id=>document.getElementById(id).style.display=admin?'inline-block':'none');
+      document.getElementById('adminReports').style.display=admin?'block':'none';
+      loadData(true);
+    }).login(pin);
+  }
+
+  function logout(){sessionUser=null;appData=null;clearInterval(refreshTimer);clearInterval(localTimer);document.getElementById('app').classList.add('hidden');document.getElementById('loginPanel').classList.remove('hidden')}
+
+  function loadData(first=false){
+    if(!sessionUser)return;
+    gs(data=>{appData=data; renderAll(); startIntervals(); if(first) toast('Dashboard ready');}).getInitialData(sessionUser);
+  }
+
+  function startIntervals(){
+    clearInterval(refreshTimer); clearInterval(localTimer);
+    const sec=Number(appData?.settings?.refreshSeconds||20);
+    refreshTimer=setInterval(()=>{ if(Object.keys(pending).some(k=>pending[k])) return; gs(data=>{appData=data; renderAll(false);}).getDashboardData(sessionUser); },sec*1000);
+    localTimer=setInterval(updateLocalTimers,1000);
+  }
+
+  function renderAll(draw=true){
+    document.getElementById('pageTitle').textContent=appData.settings.hospitalHeader||'Mina new street - OPD Flow';
+    document.getElementById('footerText').textContent=appData.settings.footerText||'Designed By Mr. Mohamed Ghonim';
+    document.getElementById('serverTime').textContent='Server time: '+appData.serverTime;
+    applyStats(appData.stats);
+    renderClinics(); renderVisits();
+    if(draw) google.charts.setOnLoadCallback(drawCharts);
+  }
+
+  function applyStats(stats){
+    document.getElementById('totalVisits').textContent=stats.totalVisits;
+    document.getElementById('occupiedClinics').textContent=stats.occupiedClinics;
+    document.getElementById('vacantClinics').textContent=stats.vacantClinics;
+    document.getElementById('avgDuration').textContent=stats.avgDuration+' min';
+  }
+
+  function renderClinics(){
+    const grid=document.getElementById('clinicGrid'); grid.innerHTML='';
+    (appData?.clinics||[]).forEach(c=>{
+      const occupied=String(c.status).toLowerCase()==='occupied';
+      const warning=occupied && c.rawStartTime && ((Date.now()-new Date(c.rawStartTime).getTime())/60000 >= Number(appData.settings.longDurationThreshold||LONG_MINUTES));
+      const doctorShown=c.currentDoctor||sessionUser.doctorName||sessionUser.userName||'Doctor';
+      const busy=!!pending[c.clinicId];
+      const card=document.createElement('div');
+      card.className='clinic '+(!occupied?'vacant ':'')+(occupied?'occupied ':'')+(warning?'warning':'');
+      card.id='card_'+c.clinicId;
+      card.innerHTML=`
+        <div class="clinicHead">
+          <div><div class="clinicName">${esc(c.clinicName)}</div><small>${esc(c.clinicId)}</small></div>
+          <div class="status ${warning?'warningPill':occupied?'occupiedPill':'vacantPill'}" id="pill_${c.clinicId}">${warning?'LONG > 30 MIN':occupied?'OCCUPIED':'VACANT'}</div>
+        </div>
+        <div class="meta">
+          <div><b>Doctor:</b> ${esc(doctorShown)}</div>
+          <div><b>Start:</b> <span id="startText_${c.clinicId}">${esc(c.startTime||'-')}</span></div>
+          <div class="timer" id="timer_${c.clinicId}" data-start="${c.rawStartTime||''}" data-occupied="${occupied}">${occupied?formatDuration(c.rawStartTime):'00:00:00'}</div>
+        </div>
+        ${isAdmin()?'<div class="adminOnlyNote">Admin view only — no start/discharge actions</div>':`<div class="clinicActions">
+          <button data-clinic="${c.clinicId}" id="start_${c.clinicId}" class="btn-green" onclick="startPatient('${c.clinicId}')" ${occupied||busy?'disabled':''}>▶ Start Patient</button>
+          <button data-clinic="${c.clinicId}" id="end_${c.clinicId}" class="btn-red" onclick="dischargePatient('${c.clinicId}')" ${occupied&&!busy?'':'disabled'}>✓ Discharge Patient</button>
+        </div>`}`;
+      grid.appendChild(card);
+    });
+  }
+
+  function startPatient(clinicId){
+    if(isAdmin()) return toast('Admin view is read-only. Login as doctor to start patient.', true);
+    if(pending[clinicId]) return;
+    const clinic=appData.clinics.find(c=>String(c.clinicId)===String(clinicId));
+    if(!clinic || String(clinic.status).toLowerCase()==='occupied') return toast('This clinic is already occupied.',true);
+
+    pending[clinicId]=true;
+    const now=new Date();
+    clinic.status='Occupied'; clinic.currentDoctor=sessionUser.doctorName||sessionUser.userName||'Doctor'; clinic.rawStartTime=now.toISOString(); clinic.startTime=toLocalText(now); clinic.longWarning='No';
+    appData.stats.totalVisits += 1;
+    appData.stats.openVisits += 1;
+    appData.stats.occupiedClinics += 1;
+    appData.stats.vacantClinics = Math.max(0, appData.stats.vacantClinics-1);
+    renderClinics(); applyStats(appData.stats); updateLocalTimers();
+
+    gs(res=>{
+      pending[clinicId]=false;
+      clinic.lastVisitId=res.visitId; clinic.startTime=res.startTime; clinic.rawStartTime=res.rawStartTime; clinic.status='Occupied'; clinic.currentDoctor=res.doctorName;
+      appData.stats=res.stats;
+      appData.serverTime=res.serverTime;
+      renderAll();
+      toast('Visit started');
+    }).startPatient({user:sessionUser, clinicId:clinicId});
+  }
+
+  function dischargePatient(clinicId){
+    if(isAdmin()) return toast('Admin view is read-only. Login as doctor to discharge patient.', true);
+    if(pending[clinicId]) return;
+    const clinic=appData.clinics.find(c=>String(c.clinicId)===String(clinicId));
+    if(!clinic || String(clinic.status).toLowerCase()!=='occupied') return toast('This clinic is already vacant.',true);
+    pending[clinicId]=true;
+    const btn=document.getElementById('end_'+clinicId); if(btn){btn.disabled=true; btn.textContent='Discharging...'}
+
+    gs(res=>{
+      pending[clinicId]=false;
+      clinic.status='Vacant'; clinic.currentDoctor=''; clinic.rawStartTime=''; clinic.startTime=''; clinic.longWarning='No'; clinic.lastVisitId='';
+      appData.stats=res.stats;
+      appData.serverTime=res.serverTime;
+      renderAll();
+      toast('Discharged. Room is ready for next patient.');
+    }).dischargePatient({user:sessionUser, clinicId:clinicId});
+  }
+
+  function backupToday(){gs(res=>toast(res.message)).backupToday(sessionUser)}
+  function manualReset(){if(!confirm('Daily reset will make all clinics vacant while keeping visit history. Continue?'))return; gs(data=>{appData=data;renderAll();toast('Daily reset completed')}).manualDailyReset(sessionUser)}
+  function downloadCsv(){gs(csv=>{const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='OPD_Visits_Today.csv';a.click();URL.revokeObjectURL(a.href);}).exportTodayCsv(sessionUser)}
+
+  function renderVisits(){
+    const tb=document.getElementById('visitRows'); tb.innerHTML='';
+    (appData.stats.visits||[]).slice().reverse().forEach(v=>tb.insertAdjacentHTML('beforeend',`<tr><td>${esc(v.visitId)}</td><td>${esc(v.clinicName)}</td><td>${esc(v.doctorName)}</td><td>${esc(v.startTime)}</td><td>${esc(v.endTime)}</td><td>${esc(v.duration||'')}</td><td>${esc(v.status)}</td></tr>`));
+  }
+
+  function drawCharts(){
+    if(!appData || String(sessionUser.role).toLowerCase()!=='admin') return;
+    drawBar('hourChart','Visits Per Hour','Hour','Visits',appData.stats.byHour,true);
+    drawBar('clinicChart','Visits Per Clinic','Clinic','Visits',appData.stats.byClinic,false);
+    const doctorRows={}; (appData.stats.byDoctor||[]).forEach(d=>doctorRows[d.doctor]=d.avg);
+    drawBar('doctorChart','Average Duration Per Doctor','Doctor','Avg Min',doctorRows,false);
+    const statusData=google.visualization.arrayToDataTable([['Status','Count'],['Occupied',appData.stats.occupiedClinics],['Vacant',appData.stats.vacantClinics]]);
+    new google.visualization.PieChart(document.getElementById('statusChart')).draw(statusData,{title:'Occupied vs Vacant',backgroundColor:'transparent',legend:{textStyle:{color:'#111827'}},titleTextStyle:{color:'#111827',fontSize:16},pieHole:.45});
+  }
+  function drawBar(id,title,klabel,vlabel,obj,numericSort){const arr=[[klabel,vlabel]];Object.keys(obj||{}).sort((a,b)=>numericSort?Number(a)-Number(b):a.localeCompare(b)).forEach(k=>arr.push([k,Number(obj[k]||0)])); if(arr.length===1) arr.push(['No data',0]); const data=google.visualization.arrayToDataTable(arr); new google.visualization.ColumnChart(document.getElementById(id)).draw(data,{title:title,backgroundColor:'transparent',legend:{position:'none'},titleTextStyle:{color:'#111827',fontSize:16},hAxis:{textStyle:{color:'#111827'}},vAxis:{minValue:0,textStyle:{color:'#111827'}}});}
+
+  function updateLocalTimers(){
+    document.querySelectorAll('.timer[data-occupied="true"]').forEach(el=>{
+      const start=el.getAttribute('data-start'); if(start) el.textContent=formatDuration(start);
+      const clinicId=el.id.replace('timer_','');
+      const mins=(Date.now()-new Date(start).getTime())/60000;
+      const threshold=Number(appData?.settings?.longDurationThreshold||LONG_MINUTES);
+      if(mins>=threshold){
+        const card=document.getElementById('card_'+clinicId); const pill=document.getElementById('pill_'+clinicId);
+        if(card) card.classList.add('warning'); if(pill){pill.className='status warningPill'; pill.textContent='LONG > 30 MIN';}
+      }
+    });
+  }
+  function formatDuration(iso){if(!iso)return '00:00:00';let total=Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/1000));const h=Math.floor(total/3600);total%=3600;const m=Math.floor(total/60);const s=total%60;return `${pad(h)}:${pad(m)}:${pad(s)}`}
+  function pad(n){return String(n).padStart(2,'0')}
+  function toLocalText(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())}
+  function esc(x){return String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+</script>
+</body>
+</html>
