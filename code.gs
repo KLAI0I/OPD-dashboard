@@ -23,10 +23,40 @@ const DEFAULT_SETTINGS = {
   refreshSeconds: 20
 };
 
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Mina new street - OPD Flow')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function doGet(e) {
+  // Normal Apps Script web app hosting
+  if (!e || !e.parameter || !e.parameter.api) {
+    return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle('Mina new street - OPD Flow')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  // GitHub Pages / external static hosting bridge via JSONP
+  const callback = String(e.parameter.callback || 'callback').replace(/[^a-zA-Z0-9_.$]/g, '');
+  const fn = String(e.parameter.fn || '');
+  const allowed = {
+    login: login,
+    getInitialData: getInitialData,
+    getDashboardData: getDashboardData,
+    startPatient: startPatient,
+    dischargePatient: dischargePatient,
+    backupToday: backupToday,
+    manualDailyReset: manualDailyReset,
+    exportTodayCsv: exportTodayCsv
+  };
+
+  let payload;
+  try {
+    if (!allowed[fn]) throw new Error('API function not allowed: ' + fn);
+    const args = e.parameter.args ? JSON.parse(e.parameter.args) : [];
+    payload = { ok: true, data: allowed[fn].apply(null, args) };
+  } catch (err) {
+    payload = { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+
+  return ContentService
+    .createTextOutput(callback + '(' + JSON.stringify(payload) + ');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 function ss_() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
