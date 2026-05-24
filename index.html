@@ -397,7 +397,7 @@
 
   function startIntervals(){
     clearInterval(refreshTimer); clearInterval(localTimer);
-    const sec=Number(appData?.settings?.refreshSeconds||20);
+    const sec=Math.max(3, Number(appData?.settings?.refreshSeconds||3));
     refreshTimer=setInterval(()=>{ if(Object.keys(pending).some(k=>pending[k])) return; gs(data=>{appData=data; renderAll(false);}).getDashboardData(sessionUser); },sec*1000);
     localTimer=setInterval(updateLocalTimers,1000);
   }
@@ -460,14 +460,17 @@
     appData.stats.occupiedClinics += 1;
     appData.stats.vacantClinics = Math.max(0, appData.stats.vacantClinics-1);
     renderClinics(); applyStats(appData.stats); updateLocalTimers();
+    const startBtn=document.getElementById('start_'+clinicId);
+    if(startBtn){startBtn.disabled=true; startBtn.textContent='Starting...';}
 
     gs(res=>{
       pending[clinicId]=false;
       clinic.lastVisitId=res.visitId; clinic.startTime=res.startTime; clinic.rawStartTime=res.rawStartTime; clinic.status='Occupied'; clinic.currentDoctor=res.doctorName;
-      appData.stats=res.stats;
+      if(res.stats) appData.stats=res.stats;
       appData.serverTime=res.serverTime;
-      renderAll();
+      renderClinics(); applyStats(appData.stats); updateLocalTimers();
       toast('Visit started');
+      syncDashboardSoon();
     }).startPatient({user:sessionUser, clinicId:clinicId});
   }
 
@@ -482,16 +485,24 @@
     gs(res=>{
       pending[clinicId]=false;
       clinic.status='Vacant'; clinic.currentDoctor=''; clinic.rawStartTime=''; clinic.startTime=''; clinic.longWarning='No'; clinic.lastVisitId='';
-      appData.stats=res.stats;
+      if(res.stats) appData.stats=res.stats;
       appData.serverTime=res.serverTime;
-      renderAll();
+      renderClinics(); applyStats(appData.stats); updateLocalTimers();
       toast('Discharged. Room is ready for next patient.');
+      syncDashboardSoon();
     }).dischargePatient({user:sessionUser, clinicId:clinicId});
   }
 
   function backupToday(){gs(res=>toast(res.message)).backupToday(sessionUser)}
   function manualReset(){if(!confirm('Daily reset will make all clinics vacant while keeping visit history. Continue?'))return; gs(data=>{appData=data;renderAll();toast('Daily reset completed')}).manualDailyReset(sessionUser)}
   function downloadCsv(){gs(csv=>{const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='OPD_Visits_Today.csv';a.click();URL.revokeObjectURL(a.href);}).exportTodayCsv(sessionUser)}
+
+  function syncDashboardSoon(){
+    setTimeout(()=>{
+      if(!sessionUser || Object.keys(pending).some(k=>pending[k])) return;
+      gs(data=>{appData=data; renderAll(false);}).getDashboardData(sessionUser);
+    }, 800);
+  }
 
   function renderVisits(){
     const tb=document.getElementById('visitRows'); tb.innerHTML='';
