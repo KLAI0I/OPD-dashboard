@@ -312,7 +312,7 @@
   function toast(msg,isError=false){const t=document.createElement('div');t.className='toast'+(isError?' error':'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500)}
   // For GitHub Pages: paste your deployed Google Apps Script Web App /exec URL here.
   // Example: https://script.google.com/macros/s/AKfycbxxxx/exec
-  const WEB_APP_URL = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_EXEC_URL_HERE';
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxKvK1pxLCHDa3dLBOEaR17FJ73X-FGxycsRIUujaxAJz7vgDi7eJtR2G55Nmt4m0rDtA/exec';
 
   function apiCall(fn, args, success){
     // If hosted inside Google Apps Script, use native google.script.run.
