@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS = {
   hospitalHeader: 'Mina new street - OPD Flow',
   footerText: 'Designed By Mr. Mohamed Ghonim',
   longDurationThreshold: 30,
-  refreshSeconds: 20
+  refreshSeconds: 3
 };
 
 function doGet(e) {
@@ -251,7 +251,7 @@ function startPatient(payload) {
       status: 'Occupied',
       startTime: dt_(start),
       rawStartTime: start.toISOString(),
-      stats: getStats_(user),
+      stats: null,
       serverTime: dt_(now_())
     };
   } finally {
@@ -308,7 +308,7 @@ function dischargePatient(payload) {
       visitId: visitId,
       duration: duration,
       status: 'Vacant',
-      stats: getStats_(user),
+      stats: null,
       serverTime: dt_(now_())
     };
   } finally {
