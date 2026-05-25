@@ -208,6 +208,30 @@
       text-align:center;
     }
 
+
+    .filterGrid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(160px,1fr));
+      gap:12px;
+      align-items:end;
+      margin-bottom:14px;
+    }
+    .filterField label{
+      display:block;
+      font-weight:900;
+      color:var(--brand);
+      margin-bottom:6px;
+      font-size:13px;
+    }
+    .filterField input{font-size:15px;padding:12px}
+    .filterActions{display:flex;gap:10px;flex-wrap:wrap}
+    .filterActions button{width:auto;padding:12px 16px}
+    .reportNote{
+      margin:8px 0 14px;
+      color:var(--muted);
+      font-weight:800;
+    }
+
     .chartGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
     .chart{
       background:#fff;
@@ -218,22 +242,6 @@
       color:#111827;
       box-shadow:var(--softShadow);
     }
-    .reportTools{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
-      gap:10px;
-      align-items:end;
-      padding:14px;
-      border:1px solid var(--line);
-      border-radius:18px;
-      background:linear-gradient(135deg,#ffffff,#f3f8ff);
-      margin-bottom:14px;
-    }
-    .field label{display:block;font-size:13px;font-weight:900;color:var(--brand);margin-bottom:6px}
-    .field input{padding:12px;font-size:15px}
-    .reportSummary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:0 0 14px 0}
-    .miniStat{background:#f8fbff;border:1px solid #dbeafe;border-radius:16px;padding:12px;color:var(--brand);font-weight:900}
-    .miniStat small{display:block;color:var(--muted);font-weight:800;margin-bottom:5px}
     .tableWrap{overflow:auto}
     table{width:100%;border-collapse:separate;border-spacing:0 8px;color:#24446f}
     th,td{text-align:left;padding:12px;background:#f8fbff;border-top:1px solid #e4effd;border-bottom:1px solid #e4effd}
@@ -252,6 +260,7 @@
       h1{font-size:26px}
       .stats{grid-template-columns:1fr 1fr}
       .chartGrid{grid-template-columns:1fr}
+      .filterGrid{grid-template-columns:1fr}
       .clinicActions{grid-template-columns:1fr}
       .container{padding:10px}
     }
@@ -294,7 +303,7 @@
       </section>
 
       <section class="stats">
-        <div class="stat"><span>Total Visits Today</span><b id="totalVisits">0</b></div>
+        <div class="stat"><span>Total Visits</span><b id="totalVisits">0</b></div>
         <div class="stat"><span>Occupied Clinics</span><b id="occupiedClinics">0</b></div>
         <div class="stat"><span>Vacant Clinics</span><b id="vacantClinics">0</b></div>
         <div class="stat"><span>Avg Duration / Completed</span><b id="avgDuration">0 min</b></div>
@@ -306,20 +315,25 @@
       </section>
 
       <section id="adminReports" class="panel">
-        <div class="topbar"><h2 style="margin:0">Reports & Charts</h2><small class="muted">Filter by a specific date or date period, then export the results</small></div><br>
-        <div class="reportTools">
-          <div class="field"><label>From Date</label><input type="date" id="reportFromDate"></div>
-          <div class="field"><label>To Date</label><input type="date" id="reportToDate"></div>
-          <button class="btn-green" onclick="loadReportData()">Show Statistics</button>
-          <button class="btn-dark" onclick="downloadReportCsv()">Export Filtered CSV / Excel</button>
-          <button class="btn-orange" onclick="exportReportCharts()">Export Charts PNG</button>
+        <div class="topbar"><h2 style="margin:0">Reports & Charts</h2><small class="muted">Filter by one date or a period, then export matching charts/statistics</small></div><br>
+        <div class="filterGrid">
+          <div class="filterField"><label>From date</label><input id="fromDate" type="date"></div>
+          <div class="filterField"><label>To date</label><input id="toDate" type="date"></div>
+          <div class="filterActions">
+            <button class="btn-green" onclick="applyReportFilter()">Show Statistics</button>
+            <button class="btn-dark" onclick="setTodayFilter()">Today</button>
+          </div>
+          <div class="filterActions">
+            <button class="btn-orange" onclick="downloadReportCsv()">Export Filtered CSV / Excel</button>
+            <button class="btn-red" onclick="window.print()">Export Filtered PDF</button>
+          </div>
         </div>
-        <div id="reportSummary" class="reportSummary hidden"></div>
-        <div class="chartGrid"><div id="hourChart" class="chart"></div><div id="clinicChart" class="chart"></div><div id="doctorChart" class="chart"></div><div id="statusChart" class="chart"></div></div>
+        <div id="reportNote" class="reportNote">Current report: Today</div>
+        <div class="chartGrid"><div id="dateChart" class="chart"></div><div id="hourChart" class="chart"></div><div id="clinicChart" class="chart"></div><div id="doctorChart" class="chart"></div><div id="statusChart" class="chart"></div></div>
       </section>
 
       <section class="panel">
-        <h2>Today Visit Log</h2>
+        <h2 id="visitLogTitle">Visit Log</h2>
         <div class="tableWrap"><table><thead><tr><th>Visit ID</th><th>Clinic</th><th>Doctor</th><th>Start</th><th>End</th><th>Duration</th><th>Status</th></tr></thead><tbody id="visitRows"></tbody></table></div>
       </section>
     </div>
@@ -328,7 +342,7 @@
 
 <script>
   google.charts.load('current', {'packages':['corechart']});
-  let sessionUser=null, appData=null, reportData=null, refreshTimer=null, localTimer=null, pending={}, chartRefs={};
+  let sessionUser=null, appData=null, refreshTimer=null, localTimer=null, pending={};
   const LONG_MINUTES = 30;
   const isAdmin = () => String(sessionUser?.role || '').toLowerCase() === 'admin';
 
@@ -394,8 +408,8 @@
       backupToday: user => apiCall('backupToday', [user], success),
       manualDailyReset: user => apiCall('manualDailyReset', [user], success),
       exportTodayCsv: user => apiCall('exportTodayCsv', [user], success),
-      getReportData: (user, startDate, endDate) => apiCall('getReportData', [user, startDate, endDate], success),
-      exportReportCsv: (user, startDate, endDate) => apiCall('exportReportCsv', [user, startDate, endDate], success)
+      getReportData: filter => apiCall('getReportData', [sessionUser, filter], success),
+      exportReportCsv: filter => apiCall('exportReportCsv', [sessionUser, filter], success)
     };
   }
   function clearPendingButtons(){Object.keys(pending).forEach(id=>pending[id]=false); document.querySelectorAll('button[data-clinic]').forEach(b=>b.disabled=false); renderClinics();}
@@ -410,9 +424,8 @@
       const admin=String(user.role).toLowerCase()==='admin';
       ['backupBtn','resetBtn','csvBtn','pdfBtn'].forEach(id=>document.getElementById(id).style.display=admin?'inline-block':'none');
       document.getElementById('adminReports').style.display=admin?'block':'none';
-      if(admin) setDefaultReportDates();
+      initReportDates();
       loadData(true);
-      if(admin) setTimeout(loadReportData, 400);
     }).login(pin);
   }
 
@@ -435,6 +448,7 @@
     document.getElementById('footerText').textContent=appData.settings.footerText||'Designed By Mr. Mohamed Ghonim';
     document.getElementById('serverTime').textContent='Server time: '+appData.serverTime;
     applyStats(appData.stats);
+    updateReportLabels();
     renderClinics(); renderVisits();
     if(draw) google.charts.setOnLoadCallback(drawCharts);
   }
@@ -521,65 +535,68 @@
     }).dischargePatient({user:sessionUser, clinicId:clinicId});
   }
 
+
+  function initReportDates(){
+    const today = new Date();
+    const iso = today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
+    const from = document.getElementById('fromDate');
+    const to = document.getElementById('toDate');
+    if(from && !from.value) from.value = iso;
+    if(to && !to.value) to.value = iso;
+  }
+
+  function getReportFilter(){
+    const from = document.getElementById('fromDate')?.value || '';
+    const to = document.getElementById('toDate')?.value || from;
+    if(from && to && from > to){ toast('Start date cannot be after end date.', true); return null; }
+    return {startDate: from, endDate: to || from};
+  }
+
+  function setTodayFilter(){
+    initReportDates();
+    const today = new Date();
+    const iso = today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
+    document.getElementById('fromDate').value = iso;
+    document.getElementById('toDate').value = iso;
+    applyReportFilter();
+  }
+
+  function applyReportFilter(){
+    if(!isAdmin()) return;
+    const filter = getReportFilter();
+    if(!filter) return;
+    gs(data=>{
+      appData=data;
+      renderAll(true);
+      toast('Filtered report loaded');
+    }).getReportData(filter);
+  }
+
+  function updateReportLabels(){
+    if(!appData?.stats) return;
+    const s=appData.stats;
+    const same = s.startDate && s.endDate && s.startDate===s.endDate;
+    const text = s.startDate ? (same ? 'Current report: '+s.startDate : 'Current report: '+s.startDate+' to '+s.endDate) : 'Current report: Today';
+    const note=document.getElementById('reportNote'); if(note) note.textContent=text;
+    const title=document.getElementById('visitLogTitle'); if(title) title.textContent = same ? 'Visit Log - '+s.startDate : 'Visit Log - '+(s.startDate||'')+' to '+(s.endDate||'');
+  }
+
+
   function backupToday(){gs(res=>toast(res.message)).backupToday(sessionUser)}
   function manualReset(){if(!confirm('Daily reset will make all clinics vacant while keeping visit history. Continue?'))return; gs(data=>{appData=data;renderAll();toast('Daily reset completed')}).manualDailyReset(sessionUser)}
-  function downloadCsv(){gs(csv=>{const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='OPD_Visits_Today.csv';a.click();URL.revokeObjectURL(a.href);}).exportTodayCsv(sessionUser)}
-
-  function setDefaultReportDates(){
-    const today=new Date();
-    const iso=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
-    const from=document.getElementById('reportFromDate');
-    const to=document.getElementById('reportToDate');
-    if(from && !from.value) from.value=iso;
-    if(to && !to.value) to.value=iso;
-  }
-
-  function reportDates(){
-    const from=document.getElementById('reportFromDate').value;
-    const to=document.getElementById('reportToDate').value || from;
-    if(!from) { toast('Select From Date first.', true); return null; }
-    if(to && from > to) { toast('From Date cannot be after To Date.', true); return null; }
-    return {from,to};
-  }
-
-  function loadReportData(){
-    if(!sessionUser || !isAdmin()) return;
-    const d=reportDates(); if(!d) return;
-    gs(data=>{reportData=data; renderReportSummary(data); google.charts.setOnLoadCallback(()=>drawReportCharts(data)); toast('Filtered statistics loaded');}).getReportData(sessionUser,d.from,d.to);
-  }
-
-  function renderReportSummary(data){
-    const box=document.getElementById('reportSummary');
-    box.classList.remove('hidden');
-    box.innerHTML=`
-      <div class="miniStat"><small>Period</small>${esc(data.startDate)} → ${esc(data.endDate)}</div>
-      <div class="miniStat"><small>Total Visits</small>${Number(data.totalVisits||0)}</div>
-      <div class="miniStat"><small>Completed</small>${Number(data.completedVisits||0)}</div>
-      <div class="miniStat"><small>Open</small>${Number(data.openVisits||0)}</div>
-      <div class="miniStat"><small>Avg Duration</small>${Number(data.avgDuration||0)} min</div>
-    `;
-  }
+  function downloadCsv(){downloadReportCsv()}
 
   function downloadReportCsv(){
-    if(!sessionUser || !isAdmin()) return toast('Admin only.', true);
-    const d=reportDates(); if(!d) return;
-    gs(csv=>{const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`OPD_Visits_${d.from}_to_${d.to}.csv`;a.click();URL.revokeObjectURL(a.href);}).exportReportCsv(sessionUser,d.from,d.to);
-  }
-
-  function exportReportCharts(){
-    const ids=['hourChart','clinicChart','doctorChart','statusChart'];
-    let exported=0;
-    ids.forEach(id=>{
-      const chart=chartRefs[id];
-      if(chart && typeof chart.getImageURI==='function'){
-        const a=document.createElement('a');
-        a.href=chart.getImageURI();
-        a.download=id+'_filtered_report.png';
-        a.click();
-        exported++;
-      }
-    });
-    if(!exported) toast('Load statistics first, then export charts.', true);
+    const filter = getReportFilter();
+    if(!filter) return;
+    gs(csv=>{
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='OPD_Visits_'+(filter.startDate||'report')+'_to_'+(filter.endDate||filter.startDate||'report')+'.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }).exportReportCsv(filter);
   }
 
   function syncDashboardSoon(){
@@ -596,25 +613,17 @@
 
   function drawCharts(){
     if(!appData || String(sessionUser.role).toLowerCase()!=='admin') return;
-    drawBar('hourChart','Today Visits Per Hour','Hour','Visits',appData.stats.byHour,true);
-    drawBar('clinicChart','Today Visits Per Clinic','Clinic','Visits',appData.stats.byClinic,false);
+    drawBar('dateChart','Visits Per Date','Date','Visits',appData.stats.byDate||{},false);
+    drawBar('hourChart','Visits Per Hour','Hour','Visits',appData.stats.byHour,true);
+    drawBar('clinicChart','Visits Per Clinic','Clinic','Visits',appData.stats.byClinic,false);
     const doctorRows={}; (appData.stats.byDoctor||[]).forEach(d=>doctorRows[d.doctor]=d.avg);
-    drawBar('doctorChart','Today Average Duration Per Doctor','Doctor','Avg Min',doctorRows,false);
-    const statusData=google.visualization.arrayToDataTable([['Status','Count'],['Occupied',appData.stats.occupiedClinics],['Vacant',appData.stats.vacantClinics]]);
-    const chart=new google.visualization.PieChart(document.getElementById('statusChart'));
-    chart.draw(statusData,{title:'Current Occupied vs Vacant',backgroundColor:'transparent',legend:{textStyle:{color:'#111827'}},titleTextStyle:{color:'#111827',fontSize:16},pieHole:.45});
-    chartRefs.statusChart=chart;
+    drawBar('doctorChart','Average Duration Per Doctor','Doctor','Avg Min',doctorRows,false);
+    const statusObj = appData.stats.byStatus && Object.keys(appData.stats.byStatus).length ? appData.stats.byStatus : {'Open':appData.stats.openVisits||0,'Completed':appData.stats.completedVisits||0};
+    const statusArr=[['Status','Count']]; Object.keys(statusObj).sort().forEach(k=>statusArr.push([k,Number(statusObj[k]||0)]));
+    const statusData=google.visualization.arrayToDataTable(statusArr);
+    new google.visualization.PieChart(document.getElementById('statusChart')).draw(statusData,{title:'Visit Status',backgroundColor:'transparent',legend:{textStyle:{color:'#111827'}},titleTextStyle:{color:'#111827',fontSize:16},pieHole:.45});
   }
-  function drawReportCharts(data){
-    if(!data) return;
-    drawBar('hourChart','Filtered Visits Per Hour','Hour','Visits',data.byHour,true);
-    drawBar('clinicChart','Filtered Visits Per Clinic','Clinic','Visits',data.byClinic,false);
-    const doctorRows={}; (data.byDoctor||[]).forEach(d=>doctorRows[d.doctor]=d.avg);
-    drawBar('doctorChart','Filtered Average Duration Per Doctor','Doctor','Avg Min',doctorRows,false);
-    drawPie('statusChart','Filtered Visits By Status',data.byStatus);
-  }
-  function drawBar(id,title,klabel,vlabel,obj,numericSort){const arr=[[klabel,vlabel]];Object.keys(obj||{}).sort((a,b)=>numericSort?Number(a)-Number(b):a.localeCompare(b)).forEach(k=>arr.push([k,Number(obj[k]||0)])); if(arr.length===1) arr.push(['No data',0]); const data=google.visualization.arrayToDataTable(arr); const chart=new google.visualization.ColumnChart(document.getElementById(id)); chart.draw(data,{title:title,backgroundColor:'transparent',legend:{position:'none'},titleTextStyle:{color:'#111827',fontSize:16},hAxis:{textStyle:{color:'#111827'}},vAxis:{minValue:0,textStyle:{color:'#111827'}}}); chartRefs[id]=chart;}
-  function drawPie(id,title,obj){const arr=[['Status','Count']];Object.keys(obj||{}).sort().forEach(k=>arr.push([k,Number(obj[k]||0)])); if(arr.length===1) arr.push(['No data',0]); const data=google.visualization.arrayToDataTable(arr); const chart=new google.visualization.PieChart(document.getElementById(id)); chart.draw(data,{title:title,backgroundColor:'transparent',legend:{textStyle:{color:'#111827'}},titleTextStyle:{color:'#111827',fontSize:16},pieHole:.45}); chartRefs[id]=chart;}
+  function drawBar(id,title,klabel,vlabel,obj,numericSort){const arr=[[klabel,vlabel]];Object.keys(obj||{}).sort((a,b)=>numericSort?Number(a)-Number(b):a.localeCompare(b)).forEach(k=>arr.push([k,Number(obj[k]||0)])); if(arr.length===1) arr.push(['No data',0]); const data=google.visualization.arrayToDataTable(arr); new google.visualization.ColumnChart(document.getElementById(id)).draw(data,{title:title,backgroundColor:'transparent',legend:{position:'none'},titleTextStyle:{color:'#111827',fontSize:16},hAxis:{textStyle:{color:'#111827'}},vAxis:{minValue:0,textStyle:{color:'#111827'}}});}
 
   function updateLocalTimers(){
     document.querySelectorAll('.timer[data-occupied="true"]').forEach(el=>{
