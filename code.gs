@@ -1,5 +1,5 @@
 /*******************************************************
- MINA NEW STREET - OPD FLOW | VERSION 6 - ADMIN READONLY + FAST LOOP
+ MINA NEW STREET - OPD FLOW | VERSION 6.3 - PERIOD REPORTS API ALLOWLIST FIX
  Google Apps Script backend
  Paste this file as Code.gs
 *******************************************************/
