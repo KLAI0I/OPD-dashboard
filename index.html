@@ -234,6 +234,9 @@
     .reportSummary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:0 0 14px 0}
     .miniStat{background:#f8fbff;border:1px solid #dbeafe;border-radius:16px;padding:12px;color:var(--brand);font-weight:900}
     .miniStat small{display:block;color:var(--muted);font-weight:800;margin-bottom:5px}
+
+    .printNote{color:var(--muted);font-size:12px;margin-top:8px;font-weight:700}
+    .noPrintInChartPdf{display:block}
     .tableWrap{overflow:auto}
     table{width:100%;border-collapse:separate;border-spacing:0 8px;color:#24446f}
     th,td{text-align:left;padding:12px;background:#f8fbff;border-top:1px solid #e4effd;border-bottom:1px solid #e4effd}
@@ -288,7 +291,7 @@
           <button id="backupBtn" class="btn-orange" onclick="backupToday()">Backup Today</button>
           <button id="resetBtn" class="btn-orange" onclick="manualReset()">Daily Reset</button>
           <button id="csvBtn" class="btn-dark" onclick="downloadCsv()">Export CSV / Excel</button>
-          <button id="pdfBtn" class="btn-red" onclick="window.print()">Export PDF</button>
+          <button id="pdfBtn" class="btn-red" onclick="exportCleanChartsPdf()">Export Charts PDF A4</button>
           <button class="btn-dark" onclick="logout()">Logout</button>
         </div>
       </section>
@@ -312,7 +315,7 @@
           <div class="field"><label>To Date</label><input type="date" id="reportToDate"></div>
           <button class="btn-green" onclick="loadReportData()">Show Statistics</button>
           <button class="btn-dark" onclick="downloadReportCsv()">Export Filtered CSV / Excel</button>
-          <button class="btn-orange" onclick="exportReportCharts()">Export Charts PNG</button>
+          <button class="btn-red" onclick="exportCleanChartsPdf()">Export Charts PDF A4</button>
         </div>
         <div id="reportSummary" class="reportSummary hidden"></div>
         <div class="chartGrid"><div id="hourChart" class="chart"></div><div id="clinicChart" class="chart"></div><div id="doctorChart" class="chart"></div><div id="statusChart" class="chart"></div></div>
@@ -336,8 +339,7 @@
   function toast(msg,isError=false){const t=document.createElement('div');t.className='toast'+(isError?' error':'');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500)}
   // For GitHub Pages: paste your deployed Google Apps Script Web App /exec URL here.
   // Example: https://script.google.com/macros/s/AKfycbxxxx/exec
-  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxKS3r9_6yty0nCy-LxkM0kxwiCZ5A4sidqwWHekkf58dHMrtRBCjg52RjdQ6Grwenu7A/exec';
-  
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz7TT4MfoB7B8dkPciFpQ62W3Ed376iXTlyVPtRfMB1KZbzmb4SAPPmzHuzdDp_IJnzyg/exec';
 
   function apiCall(fn, args, success){
     // If hosted inside Google Apps Script, use native google.script.run.
@@ -567,20 +569,93 @@
     gs(csv=>{const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`OPD_Visits_${d.from}_to_${d.to}.csv`;a.click();URL.revokeObjectURL(a.href);}).exportReportCsv(sessionUser,d.from,d.to);
   }
 
-  function exportReportCharts(){
+
+  function exportCleanChartsPdf(){
+    if(!sessionUser || !isAdmin()) return toast('Admin only.', true);
+
     const ids=['hourChart','clinicChart','doctorChart','statusChart'];
-    let exported=0;
-    ids.forEach(id=>{
+    const labels={
+      hourChart:'Visits Per Hour',
+      clinicChart:'Visits Per Clinic',
+      doctorChart:'Average Duration Per Doctor',
+      statusChart:'Visits By Status'
+    };
+
+    const chartImages=ids.map(id=>{
       const chart=chartRefs[id];
-      if(chart && typeof chart.getImageURI==='function'){
-        const a=document.createElement('a');
-        a.href=chart.getImageURI();
-        a.download=id+'_filtered_report.png';
-        a.click();
-        exported++;
-      }
-    });
-    if(!exported) toast('Load statistics first, then export charts.', true);
+      if(chart && typeof chart.getImageURI==='function') return {id, uri: chart.getImageURI()};
+      return null;
+    }).filter(Boolean);
+
+    if(chartImages.length < 4) return toast('Load statistics first, then export PDF.', true);
+
+    const source = reportData || {
+      startDate:'Today',
+      endDate:'Today',
+      totalVisits:appData?.stats?.totalVisits||0,
+      completedVisits:appData?.stats?.completedVisits||0,
+      openVisits:appData?.stats?.openVisits||0,
+      avgDuration:appData?.stats?.avgDuration||0
+    };
+
+    const title = esc(appData?.settings?.hospitalHeader || 'Mina new street - OPD Flow');
+    const period = `${esc(source.startDate || '')} → ${esc(source.endDate || source.startDate || '')}`;
+    const generated = esc(new Date().toLocaleString());
+    const footer = esc(appData?.settings?.footerText || 'Designed By Mr. Mohamed Ghonim');
+
+    const summaryHtml = `
+      <div class="summary">
+        <div class="summaryItem wide"><small>Period</small><b>${period}</b></div>
+        <div class="summaryItem"><small>Total Visits</small><b>${Number(source.totalVisits||0)}</b></div>
+        <div class="summaryItem"><small>Completed</small><b>${Number(source.completedVisits||0)}</b></div>
+        <div class="summaryItem"><small>Open</small><b>${Number(source.openVisits||0)}</b></div>
+        <div class="summaryItem"><small>Avg Duration</small><b>${Number(source.avgDuration||0)} min</b></div>
+      </div>`;
+
+    const imgs = chartImages.map(c=>`
+      <div class="chartCard">
+        <div class="chartTitle">${labels[c.id]||c.id}</div>
+        <div class="chartImageWrap"><img src="${c.uri}" alt="${labels[c.id]||c.id}"></div>
+      </div>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><title>OPD Charts Report</title>
+      <style>
+        @page{size:A4 landscape;margin:10mm}
+        *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        html,body{margin:0;padding:0;background:#fff;color:#0b2b66;font-family:Arial,Helvetica,sans-serif}
+        body{width:277mm;height:190mm;overflow:hidden}
+        .page{width:277mm;height:190mm;display:flex;flex-direction:column;gap:3mm;overflow:hidden;background:#fff}
+        .header{display:grid;grid-template-columns:1fr auto;gap:8mm;align-items:start;border-bottom:1.4mm solid #0b2e78;padding-bottom:2mm;min-height:14mm}
+        h1{font-size:16pt;line-height:1.08;margin:0;color:#0b2e78;font-weight:900;letter-spacing:-.2pt}
+        .sub{font-size:8.5pt;color:#526b91;font-weight:700;margin-top:1.3mm}
+        .generated{text-align:right;font-size:8pt;color:#526b91;font-weight:700;white-space:nowrap;line-height:1.45}
+        .summary{display:grid;grid-template-columns:1.55fr repeat(4,.82fr);gap:2mm;height:17mm;flex:0 0 17mm}
+        .summaryItem{border:0.3mm solid #d9e7fb;background:#f8fbff;border-radius:2.5mm;padding:2mm;overflow:hidden}
+        .summaryItem small{display:block;color:#526b91;font-size:7.2pt;font-weight:800;margin-bottom:1mm;white-space:nowrap}
+        .summaryItem b{display:block;font-size:11pt;line-height:1.08;color:#0b2e78;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .summaryItem.wide b{font-size:9.2pt}
+        .charts{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2.5mm;flex:1 1 auto;min-height:0;overflow:hidden}
+        .chartCard{border:0.3mm solid #d9e7fb;border-radius:2.5mm;padding:1.6mm;background:#fff;overflow:hidden;break-inside:avoid;page-break-inside:avoid;display:flex;flex-direction:column;min-height:0}
+        .chartTitle{font-size:8.5pt;font-weight:900;color:#0b2e78;text-align:center;line-height:1;margin:0 0 1mm 0;height:4mm;flex:0 0 4mm}
+        .chartImageWrap{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+        .chartCard img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;display:block}
+        .footer{height:5mm;flex:0 0 5mm;text-align:center;color:#526b91;font-size:7.2pt;border-top:0.25mm solid #d9e7fb;padding-top:1.2mm;overflow:hidden}
+        @media print{
+          html,body{width:277mm!important;height:190mm!important;overflow:hidden!important}
+          .page{width:277mm!important;height:190mm!important;page-break-after:avoid;page-break-inside:avoid}
+        }
+      </style></head><body>
+      <div class="page">
+        <div class="header"><div><h1>${title}</h1><div class="sub">Reports & Charts — A4 single-page summary only, without visit details</div></div><div class="generated">Generated:<br>${generated}</div></div>
+        ${summaryHtml}
+        <div class="charts">${imgs}</div>
+        <div class="footer">${footer}</div>
+      </div>
+      <script>window.onload=function(){setTimeout(function(){window.focus();window.print();},700)};<\/script></body></html>`;
+
+    const w=window.open('', '_blank');
+    if(!w) return toast('Popup blocked. Allow popups to export PDF.', true);
+    w.document.open(); w.document.write(html); w.document.close();
   }
 
   function syncDashboardSoon(){
