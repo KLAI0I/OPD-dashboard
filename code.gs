@@ -326,9 +326,36 @@ function enforceAccess_(user, clinicId) {
   }
 }
 
-function getStats_(user) {
+
+function normalizeDateInput_(value, fallback) {
+  if (!value) return fallback;
+  if (value instanceof Date) return date_(value);
+  const s = String(value).trim();
+  if (!s) return fallback;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return date_(d);
+  return fallback;
+}
+
+function dateValue_(value) {
+  if (!value) return '';
+  if (value instanceof Date) return date_(value);
+  return normalizeDateInput_(value, '');
+}
+
+function getStatsForPeriod_(user, startDate, endDate) {
   const today = date_(now_());
-  let visits = rows_(SHEETS.VISITS).filter(v => String(v.Date) === today || (v.Date instanceof Date && date_(v.Date) === today));
+  const from = normalizeDateInput_(startDate, today);
+  const to = normalizeDateInput_(endDate || startDate, from);
+  if (from > to) throw new Error('Start date cannot be after end date.');
+
+  let visits = rows_(SHEETS.VISITS).filter(v => {
+    const vd = dateValue_(v.Date);
+    return vd && vd >= from && vd <= to;
+  });
+
   if (user && String(user.role).toLowerCase() === 'doctor') {
     visits = visits.filter(v => String(v['Clinic ID']) === String(user.assignedClinicId));
   }
@@ -337,15 +364,24 @@ function getStats_(user) {
   const occupied = clinics.filter(c => c.status === 'Occupied').length;
   const vacant = clinics.length - occupied;
   const completed = visits.filter(v => String(v.Status || '').toLowerCase() === 'completed');
+  const open = visits.filter(v => String(v.Status || '').toLowerCase() === 'open');
   const durations = completed.map(v => Number(v['Duration in Minutes'])).filter(n => !isNaN(n));
   const avg = durations.length ? Math.round((durations.reduce((a,b)=>a+b,0) / durations.length) * 10) / 10 : 0;
 
-  const byHour = {}, byClinic = {}, byDoctor = {};
+  const byHour = {}, byClinic = {}, byDoctor = {}, byDate = {}, byStatus = {};
   visits.forEach(v => {
+    const vd = dateValue_(v.Date) || 'Unknown';
+    byDate[vd] = (byDate[vd] || 0) + 1;
+
     const h = String(v['Hour of Visit'] || '');
     byHour[h] = (byHour[h] || 0) + 1;
+
     const c = String(v['Clinic Name'] || 'Unknown');
     byClinic[c] = (byClinic[c] || 0) + 1;
+
+    const st = String(v.Status || 'Unknown');
+    byStatus[st] = (byStatus[st] || 0) + 1;
+
     const d = String(v['Doctor Name'] || 'Doctor');
     if (!byDoctor[d]) byDoctor[d] = {doctor:d, visits:0, completed:0, totalDuration:0, avg:0};
     byDoctor[d].visits++;
@@ -359,17 +395,22 @@ function getStats_(user) {
 
   return {
     today: today,
+    startDate: from,
+    endDate: to,
     totalVisits: visits.length,
     completedVisits: completed.length,
-    openVisits: visits.filter(v => String(v.Status || '').toLowerCase() === 'open').length,
+    openVisits: open.length,
     occupiedClinics: occupied,
     vacantClinics: vacant,
     avgDuration: avg,
     byHour: byHour,
     byClinic: byClinic,
     byDoctor: Object.keys(byDoctor).map(k => byDoctor[k]),
+    byDate: byDate,
+    byStatus: byStatus,
     visits: visits.map(v => ({
       visitId: v['Visit ID'],
+      date: dateValue_(v.Date),
       clinicId: v['Clinic ID'],
       clinicName: v['Clinic Name'],
       doctorName: v['Doctor Name'],
@@ -380,6 +421,34 @@ function getStats_(user) {
     }))
   };
 }
+
+function getReportData(user, filter) {
+  if (String(user.role || '').toLowerCase() !== 'admin') throw new Error('Admin only.');
+  filter = filter || {};
+  return {
+    settings: getSettings_(),
+    clinics: getClinics_(user),
+    stats: getStatsForPeriod_(user, filter.startDate, filter.endDate),
+    serverTime: dt_(now_())
+  };
+}
+
+function exportReportCsv(user, filter) {
+  if (String(user.role || '').toLowerCase() !== 'admin') throw new Error('Admin only.');
+  const stats = getStatsForPeriod_(user, filter && filter.startDate, filter && filter.endDate);
+  const headers = ['Visit ID','Date','Clinic ID','Clinic Name','Doctor Name','Start Time','End Time','Duration in Minutes','Status'];
+  const lines = [headers.join(',')];
+  stats.visits.forEach(v => lines.push([v.visitId,v.date,v.clinicId,v.clinicName,v.doctorName,v.startTime,v.endTime,v.duration,v.status]
+    .map(x => '"' + String(x || '').replace(/"/g, '""') + '"').join(',')));
+  return lines.join('\n');
+}
+
+
+function getStats_(user) {
+  const today = date_(now_());
+  return getStatsForPeriod_(user, today, today);
+}
+
 
 function dailyResetIfNeeded_() {
   const today = date_(now_());
@@ -463,124 +532,3 @@ function exportTodayCsv(user) {
     .map(x => '"' + String(x || '').replace(/"/g, '""') + '"').join(',')));
   return lines.join('\n');
 }
-
-/*******************************************************
- RETROSPECTIVE REPORTS: specific date / date period
-*******************************************************/
-function parseDateStart_(value) {
-  if (!value) return null;
-  if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
-  const s = String(value).trim();
-  if (!s) return null;
-  const parts = s.split('-').map(Number);
-  if (parts.length >= 3 && parts.every(n => !isNaN(n))) return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
-  const d = new Date(s);
-  if (isNaN(d.getTime())) throw new Error('Invalid start date: ' + value);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-}
-
-function parseDateEnd_(value) {
-  const d = parseDateStart_(value);
-  if (!d) return null;
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
-function visitDate_(v) {
-  if (v.Date instanceof Date) return parseDateStart_(v.Date);
-  if (v.Date) return parseDateStart_(v.Date);
-  if (v['Start Time']) return parseDateStart_(v['Start Time']);
-  return null;
-}
-
-function filterVisitsByPeriod_(user, startDate, endDate) {
-  const start = parseDateStart_(startDate) || parseDateStart_(date_(now_()));
-  const end = parseDateEnd_(endDate || startDate) || parseDateEnd_(date_(now_()));
-  if (start.getTime() > end.getTime()) throw new Error('Start date cannot be after end date.');
-
-  let visits = rows_(SHEETS.VISITS).filter(v => {
-    const d = visitDate_(v);
-    if (!d) return false;
-    return d.getTime() >= start.getTime() && d.getTime() <= end.getTime();
-  });
-
-  if (user && String(user.role).toLowerCase() === 'doctor') {
-    visits = visits.filter(v => String(v['Clinic ID']) === String(user.assignedClinicId));
-  }
-  return {start:start, end:end, visits:visits};
-}
-
-function buildReportStats_(user, startDate, endDate) {
-  const filtered = filterVisitsByPeriod_(user, startDate, endDate);
-  const visits = filtered.visits;
-  const completed = visits.filter(v => String(v.Status || '').toLowerCase() === 'completed');
-  const open = visits.filter(v => String(v.Status || '').toLowerCase() === 'open');
-  const durations = completed.map(v => Number(v['Duration in Minutes'])).filter(n => !isNaN(n));
-  const totalDuration = durations.reduce((a,b)=>a+b,0);
-  const avgDuration = durations.length ? Math.round((totalDuration / durations.length) * 10) / 10 : 0;
-
-  const byHour = {}, byClinic = {}, byDoctor = {}, byStatus = {}, byDate = {};
-  visits.forEach(v => {
-    const dObj = visitDate_(v);
-    const day = dObj ? date_(dObj) : String(v.Date || 'Unknown');
-    const hour = String(v['Hour of Visit'] || (v['Start Time'] ? hr_(v['Start Time']) : 'Unknown'));
-    const clinic = String(v['Clinic Name'] || 'Unknown');
-    const doctor = String(v['Doctor Name'] || 'Doctor');
-    const status = String(v.Status || 'Unknown');
-    byDate[day] = (byDate[day] || 0) + 1;
-    byHour[hour] = (byHour[hour] || 0) + 1;
-    byClinic[clinic] = (byClinic[clinic] || 0) + 1;
-    byStatus[status] = (byStatus[status] || 0) + 1;
-    if (!byDoctor[doctor]) byDoctor[doctor] = {doctor:doctor, visits:0, completed:0, totalDuration:0, avg:0};
-    byDoctor[doctor].visits++;
-    const dur = Number(v['Duration in Minutes']);
-    if (!isNaN(dur) && String(status).toLowerCase() === 'completed') {
-      byDoctor[doctor].completed++;
-      byDoctor[doctor].totalDuration += dur;
-    }
-  });
-  Object.keys(byDoctor).forEach(k => byDoctor[k].avg = byDoctor[k].completed ? Math.round((byDoctor[k].totalDuration / byDoctor[k].completed) * 10) / 10 : 0);
-
-  return {
-    startDate: date_(filtered.start),
-    endDate: date_(filtered.end),
-    totalVisits: visits.length,
-    completedVisits: completed.length,
-    openVisits: open.length,
-    avgDuration: avgDuration,
-    totalDuration: totalDuration,
-    byDate: byDate,
-    byHour: byHour,
-    byClinic: byClinic,
-    byDoctor: Object.keys(byDoctor).map(k => byDoctor[k]),
-    byStatus: byStatus,
-    visits: visits.map(v => ({
-      visitId: v['Visit ID'],
-      date: v.Date instanceof Date ? date_(v.Date) : String(v.Date || ''),
-      clinicId: v['Clinic ID'],
-      clinicName: v['Clinic Name'],
-      doctorName: v['Doctor Name'],
-      startTime: v['Start Time'] ? dt_(v['Start Time']) : '',
-      endTime: v['End Time'] ? dt_(v['End Time']) : '',
-      duration: v['Duration in Minutes'],
-      hour: v['Hour of Visit'],
-      status: v.Status
-    }))
-  };
-}
-
-function getReportData(user, startDate, endDate) {
-  if (String(user.role || '').toLowerCase() !== 'admin') throw new Error('Admin only.');
-  return buildReportStats_(user, startDate, endDate);
-}
-
-function exportReportCsv(user, startDate, endDate) {
-  if (String(user.role || '').toLowerCase() !== 'admin') throw new Error('Admin only.');
-  const report = buildReportStats_(user, startDate, endDate);
-  const headers = ['Visit ID','Date','Clinic ID','Clinic Name','Doctor Name','Start Time','End Time','Duration in Minutes','Hour of Visit','Status'];
-  const lines = [headers.join(',')];
-  report.visits.forEach(v => lines.push([v.visitId,v.date,v.clinicId,v.clinicName,v.doctorName,v.startTime,v.endTime,v.duration,v.hour,v.status]
-    .map(x => '"' + String(x || '').replace(/"/g, '""') + '"').join(',')));
-  return lines.join('\n');
-}
-
